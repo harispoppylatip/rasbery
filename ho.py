@@ -1,49 +1,63 @@
-import RPi.GPIO as GPIO
 import time
+import RPi.GPIO as GPIO
 import paho.mqtt.client as mqtt
 import adafruit_dht
 import board
 
 # === Konfigurasi ===
-BROKER = "broker.hivemq.com"   # broker MQTT gratis
+BROKER = "localhost"           # pakai broker lokal
 PORT   = 1883
-TOPIC  = "haris/relay"         # topik MQTT
+TOPIC_CMD   = "haris/relay"    # terima perintah ON / OFF
+TOPIC_TEMP  = "data/a"         # publish suhu
+TOPIC_HUM   = "data/h"         # publish kelembapan
 
-PIN    = 17                    # Relay pakai GPIO17 (BCM17) agar tidak bentrok DHT di GPIO2
-dhtpin = board.D2              # DHT11 di GPIO2 (matikan I2C agar stabil)
+PIN_RELAY   = 17               # Relay di GPIO17 (pin fisik 11)
+DHT_PIN     = board.D2         # DHT11 di GPIO2 (pin fisik 3, matikan I2C)
+RELAY_ACTIVE_LOW = True
 
-# === Setup GPIO (relay aktif-low) ===
+# === Setup GPIO Relay ===
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(PIN, GPIO.OUT)
-GPIO.output(PIN, GPIO.HIGH)    # default relay OFF (aktif-low: OFF = HIGH)
+GPIO.setup(PIN_RELAY, GPIO.OUT)
+GPIO.output(PIN_RELAY, GPIO.HIGH if RELAY_ACTIVE_LOW else GPIO.LOW)  # default OFF
 
 # === Setup DHT ===
-dht_device = adafruit_dht.DHT11(dhtpin)
+dht_device = adafruit_dht.DHT11(DHT_PIN)
+
+# === Helper Relay ===
+def relay_on():
+    if RELAY_ACTIVE_LOW:
+        GPIO.output(PIN_RELAY, GPIO.LOW)
+    else:
+        GPIO.output(PIN_RELAY, GPIO.HIGH)
+
+def relay_off():
+    if RELAY_ACTIVE_LOW:
+        GPIO.output(PIN_RELAY, GPIO.HIGH)
+    else:
+        GPIO.output(PIN_RELAY, GPIO.LOW)
 
 # === Callback MQTT ===
 def on_connect(client, userdata, flags, rc):
-    print("Terhubung ke MQTT broker" if rc == 0 else f"Gagal connect rc={rc}")
+    print("✅ Terhubung ke MQTT broker" if rc == 0 else f"❌ Gagal connect rc={rc}")
     if rc == 0:
-        client.subscribe(TOPIC)
+        client.subscribe(TOPIC_CMD)
 
 def on_message(client, userdata, msg):
     pesan = msg.payload.decode().upper().strip()
-    print(f"Pesan diterima: {pesan}")
+    print(f"📩 Pesan diterima: {pesan}")
 
     if pesan == "ON":
-        GPIO.output(PIN, GPIO.LOW)   # aktif-low: LOW = ON
-        print("Relay ON")
+        relay_on()
+        print("🔌 Relay ON")
     elif pesan == "OFF":
-        GPIO.output(PIN, GPIO.HIGH)  # aktif-low: HIGH = OFF
-        print("Relay OFF")
+        relay_off()
+        print("🔌 Relay OFF")
 
 # === MQTT Client ===
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
 client.connect(BROKER, PORT, 60)
-
-# Jalankan loop MQTT di background
 client.loop_start()
 
 try:
@@ -51,17 +65,20 @@ try:
         try:
             temperature = dht_device.temperature
             humidity    = dht_device.humidity
+
             if temperature is not None:
-                client.publish("data/a", str(temperature))
-                print("Temp:", temperature)
-            # (opsional) publish kelembapan juga:
-            # if humidity is not None:
-            #     client.publish("data/h", str(humidity))
+                client.publish(TOPIC_TEMP, str(temperature))
+                print("🌡️ Suhu:", temperature)
+
+            if humidity is not None:
+                client.publish(TOPIC_HUM, str(humidity))
+                print("💧 Kelembapan:", humidity)
+
         except Exception:
-            # DHT memang kadang gagal baca, coba lagi nanti
+            # DHT kadang gagal baca
             pass
 
-        time.sleep(2)  # jeda agar stabil & tidak spam broker
+        time.sleep(2)
 
 except KeyboardInterrupt:
     print("Keluar...")

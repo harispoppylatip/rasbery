@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard Keluarga 🌿</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#ffffff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --accent:#3b82f6; --ok:#10b981; --warn:#f59e0b;
+    }
+    [data-theme="dark"]{
+      --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --border:#1f2937; --accent:#60a5fa; --ok:#34d399; --warn:#fbbf24;
+    }
+    body{font-family:sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px}
+    .wrap{max-width:780px;margin:0 auto}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    h1{font-size:1.2rem;margin:0}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .card{flex:1 1 240px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;
+          box-shadow:0 8px 20px rgba(0,0,0,.05);transition:.2s}
+    .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.1)}
+    .kpi{font-size:2.2rem;font-weight:700}
+    .muted{color:var(--muted);font-size:.9rem}
+    .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:gray}
+    .ok{background:var(--ok)} .warn{background:var(--warn)}
+    .btn{padding:10px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card);cursor:pointer}
+    .btn:active{transform:scale(.96)}
+    .btn.primary{border-color:var(--accent);color:var(--accent)}
+    .relay-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .switch{display:flex;align-items:center;gap:10px}
+    .toggle{width:48px;height:28px;background:var(--border);border-radius:999px;position:relative;cursor:pointer}
+    .toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--card);
+                   transition:left .2s}
+    .toggle.active::after{left:23px}
+    footer{margin-top:20px;color:var(--muted);font-size:.85rem;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Dashboard Keluarga 🌿</h1>
+      <div class="switch">
+        <span class="muted">Tema</span>
+        <div id="themeToggle" class="toggle"></div>
+      </div>
+    </header>
+
+    <div class="row">
+      <div class="card">
+        <div class="muted">Suhu (°C)</div>
+        <div id="temp" class="kpi">-</div>
+        <div class="muted">Update: <span id="tUpdated">-</span></div>
+      </div>
+
+      <div class="card">
+        <div class="muted">Kelembapan (%)</div>
+        <div id="hum" class="kpi">-</div>
+        <div class="muted">Update: <span id="hUpdated">-</span></div>
+      </div>
+
+      <div class="card">
+        <div class="muted">Status MQTT</div>
+        <div><span id="dot" class="status-dot"></span><span id="statusText">Menghubungkan…</span></div>
+        <div class="relay-buttons">
+          <button id="onBtn"  class="btn primary">Nyalakan Relay</button>
+          <button id="offBtn" class="btn">Matikan Relay</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>Ringan, aman di rumah – data tetap di Raspberry Pi kamu.</footer>
+  </div>
+
+  <script>
+    // === Tema (gelap/terang) ===
+    const toggle = document.getElementById('themeToggle');
+    const saved = localStorage.getItem('theme')||'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    if(saved==='dark') toggle.classList.add('active');
+    toggle.onclick=()=>{
+      const cur=document.documentElement.getAttribute('data-theme');
+      const next=cur==='light'?'dark':'light';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      toggle.classList.toggle('active');
+    };
+
+    // === MQTT via WebSocket ===
+    const client = mqtt.connect('ws://localhost:9001');
+    const TOPIC_TEMP='data/a', TOPIC_HUM='data/h', TOPIC_CMD='haris/relay';
+
+    client.on('connect',()=>{
+      document.getElementById('dot').classList.add('ok');
+      document.getElementById('statusText').textContent='Terhubung';
+      client.subscribe([TOPIC_TEMP,TOPIC_HUM]);
+    });
+    client.on('close',()=>{
+      document.getElementById('dot').classList.remove('ok');
+      document.getElementById('statusText').textContent='Terputus';
+    });
+    client.on('message',(topic,payload)=>{
+      const msg=payload.toString(), stamp=new Date().toLocaleTimeString();
+      if(topic===TOPIC_TEMP){temp.textContent=msg; tUpdated.textContent=stamp;}
+      if(topic===TOPIC_HUM){hum.textContent=msg; hUpdated.textContent=stamp;}
+    });
+    onBtn.onclick=()=>client.publish(TOPIC_CMD,'ON');
+    offBtn.onclick=()=>client.publish(TOPIC_CMD,'OFF');
+  </script>
+</body>
+</html>
