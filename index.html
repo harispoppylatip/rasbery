@@ -3,138 +3,217 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard Raspberry 🌿</title>
+  <title>Dashboard Rumah</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    :root{--bg:#f6f7fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#e5e7eb;--accent:#3b82f6;--ok:#10b981;--warn:#f59e0b}
-    [data-theme="dark"]{--bg:#0f172a;--card:#111827;--text:#e5e7eb;--muted:#9ca3af;--border:#1f2937;--accent:#60a5fa;--ok:#34d399;--warn:#fbbf24}
-    body{font-family:sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px}
-    .wrap{max-width:780px;margin:0 auto}
-    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-    h1{font-size:1.2rem;margin:0}
-    .row{display:flex;gap:12px;flex-wrap:wrap}
-    .card{flex:1 1 240px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;
-      box-shadow:0 8px 20px rgba(0,0,0,.05);transition:.2s}
-    .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.1)}
-    .kpi{font-size:2.2rem;font-weight:700;transition:transform .15s}
-    .muted{color:var(--muted);font-size:.9rem}
-    .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:gray}
-    .ok{background:var(--ok)}
-    .btn{padding:10px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card);cursor:pointer}
-    .btn:active{transform:scale(.96)}
-    .btn.primary{border-color:var(--accent);color:var(--accent)}
-    .relay-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-    .switch{display:flex;align-items:center;gap:10px}
-    .toggle{width:48px;height:28px;background:var(--border);border-radius:999px;position:relative;cursor:pointer}
-    .toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--card);transition:left .2s}
-    .toggle.active::after{left:23px}
-    footer{margin-top:20px;color:var(--muted);font-size:.85rem;text-align:center}
+    :root{
+      --bg:#f7f8fc; --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e5e7eb;
+      --brand:#2563eb; --ok:#16a34a; --warn:#f59e0b; --danger:#ef4444;
+      --temp:#ef4444; --hum:#0ea5e9; --shadow:0 10px 25px rgba(0,0,0,.06);
+      --glow: 0 0 0px rgba(37,99,235,0.0);
+    }
+    [data-theme="dark"]{
+      --bg:#0b1220; --card:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --border:#1f2937;
+      --brand:#60a5fa; --ok:#22c55e; --warn:#fbbf24; --danger:#f87171;
+      --temp:#f87171; --hum:#38bdf8; --shadow:0 10px 25px rgba(0,0,0,.35);
+      --glow: 0 0 18px rgba(96,165,250,0.55);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+    .wrap{max-width:960px;margin:0 auto;padding:20px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;gap:10px;align-items:center}
+    .logo{width:36px;height:36px;border-radius:10px;background:var(--brand);box-shadow:var(--shadow);display:grid;place-items:center;color:#fff;font-weight:700}
+    h1{font-size:1.15rem;margin:0}
+    .controls{display:flex;gap:10px;align-items:center}
+    .pill{font-size:.85rem;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow)}
+    .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-right:6px}
+    .ok{background:var(--ok)} .warn{background:var(--warn)} .err{background:var(--danger)}
+
+    /* theme toggle button */
+    .theme-btn{width:46px;height:30px;border-radius:999px;border:1px solid var(--border);background:var(--card);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
+    .theme-btn span{font-size:18px;line-height:1}
+    .grid{display:grid;gap:14px;grid-template-columns:repeat(12,1fr)}
+    .card{grid-column:span 12;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:var(--shadow)}
+    @media(min-width:720px){ .span6{grid-column:span 6} .span12{grid-column:span 12} }
+    .kpi{display:flex;align-items:center;justify-content:space-between}
+    .kpi .left{display:flex;gap:12px;align-items:center}
+    .icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;font-size:20px;box-shadow:var(--shadow)}
+    .icon.temp{background:var(--temp)} .icon.hum{background:var(--hum)}
+    .title{font-size:.95rem;color:var(--muted);margin-bottom:2px}
+    .value{font-size:2.6rem;font-weight:800;letter-spacing:.5px;transition:transform .12s}
+    .sub{font-size:.85rem;color:var(--muted)}
+    .bar{height:8px;background:var(--border);border-radius:999px;overflow:hidden}
+    .fill{height:100%;width:0%;transition:width .35s}
+    .fill.temp{background:var(--temp)} .fill.hum{background:var(--hum)}
+
+    /* relay */
+    .relay-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .relay-buttons{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{padding:12px 18px;border-radius:14px;border:1px solid var(--border);background:var(--card);cursor:pointer;transition:transform .08s, box-shadow .2s}
+    .btn:active{transform:scale(.97)}
+    .btn.primary{border-color:var(--brand);color:var(--brand)}
+    .btn.on-glow{box-shadow:var(--glow); border-color: var(--brand); color: var(--brand);}
+
+    footer{margin-top:14px;color:var(--muted);font-size:.85rem;text-align:center}
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <h1>Dashboard Keluarga 🌿</h1>
-      <div class="switch"><span class="muted">Tema</span><div id="themeToggle" class="toggle"></div></div>
-    </header>
-
-    <div class="row">
-      <div class="card">
-        <div class="muted">Suhu (°C)</div>
-        <div id="temp" class="kpi">-</div>
-        <div class="muted">Update: <span id="tUpdated">-</span></div>
-      </div>
-
-      <div class="card">
-        <div class="muted">Kelembapan (%)</div>
-        <div id="hum" class="kpi">-</div>
-        <div class="muted">Update: <span id="hUpdated">-</span></div>
-      </div>
-
-      <div class="card">
-        <div class="muted">Status MQTT</div>
-        <div><span id="dot" class="status-dot"></span><span id="statusText">Menghubungkan…</span></div>
-        <div class="relay-buttons">
-          <button id="onBtn"  class="btn primary">Nyalakan Relay</button>
-          <button id="offBtn" class="btn">Matikan Relay</button>
+      <div class="brand">
+        <div class="logo">Pi</div>
+        <div>
+          <h1>Dashboard Rumah</h1>
+          <div class="sub" id="lastUpdate">Belum ada data</div>
         </div>
       </div>
-    </div>
+      <div class="controls">
+        <span class="pill"><span id="connDot" class="status-dot"></span><span id="connText">Menghubungkan…</span></span>
+        <button id="themeToggle" class="theme-btn" aria-label="Ubah tema"><span id="themeIcon">☀️</span></button>
+      </div>
+    </header>
 
-    <footer>Ringan, aman di rumah – data tetap di Raspberry Pi kamu.</footer>
+    <section class="grid">
+      <!-- Suhu -->
+      <div class="card span6">
+        <div class="kpi">
+          <div class="left">
+            <div class="icon temp">🌡️</div>
+            <div>
+              <div class="title">Suhu</div>
+              <div id="tempVal" class="value">—</div>
+            </div>
+          </div>
+          <div class="sub" id="tTime">—</div>
+        </div>
+        <div class="bar" style="margin-top:10px"><div id="tempBar" class="fill temp"></div></div>
+      </div>
+
+      <!-- Kelembapan -->
+      <div class="card span6">
+        <div class="kpi">
+          <div class="left">
+            <div class="icon hum">💧</div>
+            <div>
+              <div class="title">Kelembapan</div>
+              <div id="humVal" class="value">—</div>
+            </div>
+          </div>
+          <div class="sub" id="hTime">—</div>
+        </div>
+        <div class="bar" style="margin-top:10px"><div id="humBar" class="fill hum"></div></div>
+      </div>
+
+      <!-- Relay -->
+      <div class="card span12">
+        <div class="relay-wrap">
+          <div>
+            <div class="title">Kontrol Relay</div>
+            <div class="sub">Tekan tombol untuk menyalakan / mematikan</div>
+          </div>
+          <div class="relay-buttons">
+            <button id="btnOn"  class="btn primary">Nyalakan</button>
+            <button id="btnOff" class="btn">Matikan</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>Data dari Raspberry Pi (MQTT). Akses lokal di jaringan rumah.</footer>
   </div>
 
   <script>
-    // === Tema ===
-    const toggle = document.getElementById('themeToggle');
-    const saved = localStorage.getItem('theme')||'light';
-    document.documentElement.setAttribute('data-theme', saved);
-    if(saved==='dark') toggle.classList.add('active');
-    toggle.onclick=()=>{
-      const cur=document.documentElement.getAttribute('data-theme');
-      const next=cur==='light'?'dark':'light';
+    // === Tema gelap/terang ===
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon   = document.getElementById('themeIcon');
+    const savedTheme  = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+    themeToggle.onclick = () => {
+      const next = document.documentElement.getAttribute('data-theme')==='light' ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', next);
       localStorage.setItem('theme', next);
-      toggle.classList.toggle('active');
+      themeIcon.textContent = next === 'dark' ? '🌙' : '☀️';
     };
 
-    // === Ambil elemen ===
-    const elTemp = document.getElementById('temp');
-    const elHum  = document.getElementById('hum');
-    const tUpdated = document.getElementById('tUpdated');
-    const hUpdated = document.getElementById('hUpdated');
-    const dot = document.getElementById('dot');
-    const statusText = document.getElementById('statusText');
-    const btnOn = document.getElementById('onBtn');
-    const btnOff = document.getElementById('offBtn');
+    // === Elemen UI ===
+    const connDot = document.getElementById('connDot');
+    const connText= document.getElementById('connText');
+    const lastUpdate = document.getElementById('lastUpdate');
+    const tempVal = document.getElementById('tempVal');
+    const humVal  = document.getElementById('humVal');
+    const tTime   = document.getElementById('tTime');
+    const hTime   = document.getElementById('hTime');
+    const tempBar = document.getElementById('tempBar');
+    const humBar  = document.getElementById('humBar');
+    const btnOn   = document.getElementById('btnOn');
+    const btnOff  = document.getElementById('btnOff');
 
-    // === MQTT via WebSocket ===
-    // Otomatis pakai host yang sama dengan halaman (works dari HP di LAN)
+    // === MQTT via WebSocket (auto ws/wss) ===
     const host = window.location.hostname || 'localhost';
-    const wsUrl = `ws://${host}:9001`;
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${proto}://${host}:9001`;
 
-    // Jika Mosquitto pakai username/password, isi di sini:
-    const opts = {
+    const client = mqtt.connect(wsUrl, {
       reconnectPeriod: 2000,
-      // username: 'haris',
-      // password: 'PASSWORDKAMU',
-    };
-
-    const client = mqtt.connect(wsUrl, opts);
+      // username:'haris', password:'PASSWORDKAMU'
+    });
 
     const TOPIC_TEMP = 'data/a';
     const TOPIC_HUM  = 'data/h';
     const TOPIC_CMD  = 'haris/relay';
 
     client.on('connect', () => {
-      dot.classList.add('ok');
-      statusText.textContent = `Terhubung (${wsUrl})`;
-      client.subscribe([TOPIC_TEMP, TOPIC_HUM], err => {
-        if (err) statusText.textContent = 'Gagal subscribe';
-      });
+      connDot.className = 'status-dot ok';
+      connText.textContent = 'Terhubung';
+      client.subscribe([TOPIC_TEMP, TOPIC_HUM]);
     });
+    client.on('reconnect', () => { connDot.className='status-dot warn'; connText.textContent='Menyambung…'; });
+    client.on('close', () => { connDot.className='status-dot'; connText.textContent='Terputus'; });
+    client.on('error', () => { connDot.className='status-dot err'; connText.textContent='Error'; });
 
-    client.on('reconnect', () => { dot.classList.remove('ok'); statusText.textContent='Menyambung ulang…'; });
-    client.on('close', () => { dot.classList.remove('ok'); statusText.textContent='Terputus'; });
-    client.on('error', (e) => { statusText.textContent = 'Error: ' + e.message; });
+    function stamp(){
+      const s = new Date().toLocaleTimeString();
+      lastUpdate.textContent = 'Terakhir diperbarui: ' + s;
+      return s;
+    }
+    function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 
     client.on('message', (topic, payload) => {
       const msg = payload.toString();
-      const s = new Date().toLocaleTimeString();
-      if (topic === TOPIC_TEMP) {
-        elTemp.textContent = msg;
-        tUpdated.textContent = s;
-        elTemp.style.transform = 'scale(1.03)'; setTimeout(()=>elTemp.style.transform='none',120);
+      if (topic === TOPIC_TEMP){
+        tempVal.textContent = msg + '°';
+        tTime.textContent = stamp();
+        const v = parseFloat(msg);
+        if (!isNaN(v)){ tempBar.style.width = clamp((v/40)*100, 0, 100) + '%'; }
+        tempVal.style.transform='scale(1.03)'; setTimeout(()=>tempVal.style.transform='none',120);
       }
-      if (topic === TOPIC_HUM) {
-        elHum.textContent = msg;
-        hUpdated.textContent = s;
-        elHum.style.transform = 'scale(1.03)'; setTimeout(()=>elHum.style.transform='none',120);
+      if (topic === TOPIC_HUM){
+        humVal.textContent = msg + '%';
+        hTime.textContent = stamp();
+        const v = parseFloat(msg);
+        if (!isNaN(v)){ humBar.style.width = clamp(v, 0, 100) + '%'; }
+        humVal.style.transform='scale(1.03)'; setTimeout(()=>humVal.style.transform='none',120);
       }
     });
 
-    btnOn.onclick  = () => client.publish(TOPIC_CMD, 'ON');
-    btnOff.onclick = () => client.publish(TOPIC_CMD, 'OFF');
+    // === Relay buttons (efek ketika ON) ===
+    let relayOnVisual = false; // visual only; lebih akurat jika kamu publish status dari Python
+    btnOn.onclick  = () => {
+      client.publish(TOPIC_CMD, 'ON');
+      relayOnVisual = true;
+      btnOn.classList.add('on-glow');
+      btnOff.classList.remove('on-glow');
+    };
+    btnOff.onclick = () => {
+      client.publish(TOPIC_CMD, 'OFF');
+      relayOnVisual = false;
+      btnOff.classList.add('on-glow');
+      btnOn.classList.remove('on-glow');
+      // hilangkan glow setelah sebentar
+      setTimeout(()=>btnOff.classList.remove('on-glow'), 600);
+    };
   </script>
 </body>
 </html>
