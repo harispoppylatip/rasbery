@@ -12,7 +12,7 @@ TOPIC_TEMP  = "data/a"         # publish suhu
 TOPIC_HUM   = "data/h"         # publish kelembapan
 
 PIN_RELAY   = 17               # Relay di GPIO17 (pin fisik 11)
-DHT_PIN     = board.D2         # DHT11 di GPIO2 (pin fisik 3, matikan I2C)
+DHT_PIN     = board.D4         # DHT11
 RELAY_ACTIVE_LOW = True
 
 # === Setup GPIO Relay ===
