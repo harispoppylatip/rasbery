@@ -76,6 +76,8 @@ try:
 
         except Exception:
             # DHT kadang gagal baca
+            print("❌ Gagal membaca sensor DHT11")
+            print(Exception)
             pass
 
         time.sleep(2)
