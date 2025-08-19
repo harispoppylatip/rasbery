@@ -74,10 +74,10 @@ try:
                 client.publish(TOPIC_HUM, str(humidity))
                 print("💧 Kelembapan:", humidity)
 
-        except Exception:
+        except Exception as e :
             # DHT kadang gagal baca
             print("❌ Gagal membaca sensor DHT11")
-            print(Exception)
+            print(e)
             pass
 
         time.sleep(2)
