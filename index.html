@@ -3,35 +3,30 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard Keluarga 🌿</title>
+  <title>Dashboard Raspberry 🌿</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    :root{
-      --bg:#f6f7fb; --card:#ffffff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --accent:#3b82f6; --ok:#10b981; --warn:#f59e0b;
-    }
-    [data-theme="dark"]{
-      --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --border:#1f2937; --accent:#60a5fa; --ok:#34d399; --warn:#fbbf24;
-    }
+    :root{--bg:#f6f7fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#e5e7eb;--accent:#3b82f6;--ok:#10b981;--warn:#f59e0b}
+    [data-theme="dark"]{--bg:#0f172a;--card:#111827;--text:#e5e7eb;--muted:#9ca3af;--border:#1f2937;--accent:#60a5fa;--ok:#34d399;--warn:#fbbf24}
     body{font-family:sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px}
     .wrap{max-width:780px;margin:0 auto}
     header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
     h1{font-size:1.2rem;margin:0}
     .row{display:flex;gap:12px;flex-wrap:wrap}
     .card{flex:1 1 240px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;
-          box-shadow:0 8px 20px rgba(0,0,0,.05);transition:.2s}
+      box-shadow:0 8px 20px rgba(0,0,0,.05);transition:.2s}
     .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.1)}
-    .kpi{font-size:2.2rem;font-weight:700}
+    .kpi{font-size:2.2rem;font-weight:700;transition:transform .15s}
     .muted{color:var(--muted);font-size:.9rem}
     .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:gray}
-    .ok{background:var(--ok)} .warn{background:var(--warn)}
+    .ok{background:var(--ok)}
     .btn{padding:10px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card);cursor:pointer}
     .btn:active{transform:scale(.96)}
     .btn.primary{border-color:var(--accent);color:var(--accent)}
     .relay-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
     .switch{display:flex;align-items:center;gap:10px}
     .toggle{width:48px;height:28px;background:var(--border);border-radius:999px;position:relative;cursor:pointer}
-    .toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--card);
-                   transition:left .2s}
+    .toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--card);transition:left .2s}
     .toggle.active::after{left:23px}
     footer{margin-top:20px;color:var(--muted);font-size:.85rem;text-align:center}
   </style>
@@ -40,10 +35,7 @@
   <div class="wrap">
     <header>
       <h1>Dashboard Keluarga 🌿</h1>
-      <div class="switch">
-        <span class="muted">Tema</span>
-        <div id="themeToggle" class="toggle"></div>
-      </div>
+      <div class="switch"><span class="muted">Tema</span><div id="themeToggle" class="toggle"></div></div>
     </header>
 
     <div class="row">
@@ -73,7 +65,7 @@
   </div>
 
   <script>
-    // === Tema (gelap/terang) ===
+    // === Tema ===
     const toggle = document.getElementById('themeToggle');
     const saved = localStorage.getItem('theme')||'light';
     document.documentElement.setAttribute('data-theme', saved);
@@ -86,26 +78,63 @@
       toggle.classList.toggle('active');
     };
 
-    // === MQTT via WebSocket ===
-    const client = mqtt.connect('ws://localhost:9001');
-    const TOPIC_TEMP='data/a', TOPIC_HUM='data/h', TOPIC_CMD='haris/relay';
+    // === Ambil elemen ===
+    const elTemp = document.getElementById('temp');
+    const elHum  = document.getElementById('hum');
+    const tUpdated = document.getElementById('tUpdated');
+    const hUpdated = document.getElementById('hUpdated');
+    const dot = document.getElementById('dot');
+    const statusText = document.getElementById('statusText');
+    const btnOn = document.getElementById('onBtn');
+    const btnOff = document.getElementById('offBtn');
 
-    client.on('connect',()=>{
-      document.getElementById('dot').classList.add('ok');
-      document.getElementById('statusText').textContent='Terhubung';
-      client.subscribe([TOPIC_TEMP,TOPIC_HUM]);
+    // === MQTT via WebSocket ===
+    // Otomatis pakai host yang sama dengan halaman (works dari HP di LAN)
+    const host = window.location.hostname || 'localhost';
+    const wsUrl = `ws://${host}:9001`;
+
+    // Jika Mosquitto pakai username/password, isi di sini:
+    const opts = {
+      reconnectPeriod: 2000,
+      // username: 'haris',
+      // password: 'PASSWORDKAMU',
+    };
+
+    const client = mqtt.connect(wsUrl, opts);
+
+    const TOPIC_TEMP = 'data/a';
+    const TOPIC_HUM  = 'data/h';
+    const TOPIC_CMD  = 'haris/relay';
+
+    client.on('connect', () => {
+      dot.classList.add('ok');
+      statusText.textContent = `Terhubung (${wsUrl})`;
+      client.subscribe([TOPIC_TEMP, TOPIC_HUM], err => {
+        if (err) statusText.textContent = 'Gagal subscribe';
+      });
     });
-    client.on('close',()=>{
-      document.getElementById('dot').classList.remove('ok');
-      document.getElementById('statusText').textContent='Terputus';
+
+    client.on('reconnect', () => { dot.classList.remove('ok'); statusText.textContent='Menyambung ulang…'; });
+    client.on('close', () => { dot.classList.remove('ok'); statusText.textContent='Terputus'; });
+    client.on('error', (e) => { statusText.textContent = 'Error: ' + e.message; });
+
+    client.on('message', (topic, payload) => {
+      const msg = payload.toString();
+      const s = new Date().toLocaleTimeString();
+      if (topic === TOPIC_TEMP) {
+        elTemp.textContent = msg;
+        tUpdated.textContent = s;
+        elTemp.style.transform = 'scale(1.03)'; setTimeout(()=>elTemp.style.transform='none',120);
+      }
+      if (topic === TOPIC_HUM) {
+        elHum.textContent = msg;
+        hUpdated.textContent = s;
+        elHum.style.transform = 'scale(1.03)'; setTimeout(()=>elHum.style.transform='none',120);
+      }
     });
-    client.on('message',(topic,payload)=>{
-      const msg=payload.toString(), stamp=new Date().toLocaleTimeString();
-      if(topic===TOPIC_TEMP){temp.textContent=msg; tUpdated.textContent=stamp;}
-      if(topic===TOPIC_HUM){hum.textContent=msg; hUpdated.textContent=stamp;}
-    });
-    onBtn.onclick=()=>client.publish(TOPIC_CMD,'ON');
-    offBtn.onclick=()=>client.publish(TOPIC_CMD,'OFF');
+
+    btnOn.onclick  = () => client.publish(TOPIC_CMD, 'ON');
+    btnOff.onclick = () => client.publish(TOPIC_CMD, 'OFF');
   </script>
 </body>
 </html>
